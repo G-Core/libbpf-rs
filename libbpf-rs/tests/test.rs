@@ -750,6 +750,28 @@ fn test_object_loading_pinned_map_from_path() {
 
 #[tag(root)]
 #[test]
+fn test_object_loading_from_pin() {
+    bump_rlimit_mlock();
+
+    let path = "/sys/fs/bpf/myprog_test_pin_to_load_from_path";
+    let prog_name = "handle__sched_switch";
+
+    let mut obj = get_test_object("runqslower.bpf.o");
+    let mut prog = get_prog_mut(&mut obj, prog_name);
+    prog.pin(path).expect("pinning prog failed");
+    let prog_id = Program::get_id_by_fd(prog.as_fd()).expect("failed to determine prog id");
+
+    let pinned_prog_fd = Program::get_fd_by_pin(path).expect("failed to get fd of pinned prog");
+    let pinned_prog_id =
+        Program::get_id_by_fd(pinned_prog_fd.as_fd()).expect("failed to determine pinned prog id");
+
+    assert_eq!(prog_id, pinned_prog_id);
+
+    prog.unpin(path).expect("unpinning program failed");
+}
+
+#[tag(root)]
+#[test]
 fn test_object_loading_loaded_map_from_id() {
     bump_rlimit_mlock();
 

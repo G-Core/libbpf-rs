@@ -624,6 +624,30 @@ impl<'obj> Program<'obj> {
         Ok(prog_info.id)
     }
 
+    /// Returns program fd by pin
+    pub fn get_fd_by_pin<P: AsRef<Path>>(path: P) -> Result<OwnedFd> {
+        let path_c = util::path_to_cstring(path)?;
+        let path_ptr = path_c.as_ptr();
+        let fd = util::parse_ret_i32(unsafe { libbpf_sys::bpf_obj_get(path_ptr) })?;
+
+        let fd = unsafe { OwnedFd::from_raw_fd(fd) };
+
+        // A pinned path may represent any kind of an object, verify that
+        // it represents a program before returning descriptor to the caller.
+        let mut info: libbpf_sys::bpf_prog_info = unsafe { mem::zeroed() };
+        let mut size = mem::size_of_val(&info) as u32;
+        // SAFETY: All pointers are derived from references and hence valid.
+        util::parse_ret(unsafe {
+            libbpf_sys::bpf_prog_get_info_by_fd(
+                fd.as_raw_fd(),
+                &mut info as *mut libbpf_sys::bpf_prog_info,
+                &mut size as *mut u32,
+            )
+        })?;
+
+        Ok(fd)
+    }
+
     /// Returns flags that have been set for the program.
     pub fn flags(&self) -> u32 {
         unsafe { libbpf_sys::bpf_program__flags(self.ptr.as_ptr()) }
