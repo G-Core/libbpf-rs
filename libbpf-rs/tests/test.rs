@@ -56,7 +56,6 @@ use crate::common::get_test_object;
 use crate::common::get_test_object_path;
 use crate::common::open_test_object;
 
-
 /// A helper function for instantiating a `RingBuffer` with a callback meant to
 /// be invoked when `action` is executed and that is intended to trigger a write
 /// to said `RingBuffer` from kernel space, which then reads a single `i32` from
@@ -750,7 +749,7 @@ fn test_object_loading_pinned_map_from_path() {
 
 #[tag(root)]
 #[test]
-fn test_object_loading_from_pin() {
+fn test_program_loading_fd_from_pinned_path() {
     bump_rlimit_mlock();
 
     let path = "/sys/fs/bpf/myprog_test_pin_to_load_from_path";
@@ -761,7 +760,8 @@ fn test_object_loading_from_pin() {
     prog.pin(path).expect("pinning prog failed");
     let prog_id = Program::get_id_by_fd(prog.as_fd()).expect("failed to determine prog id");
 
-    let pinned_prog_fd = Program::get_fd_by_pin(path).expect("failed to get fd of pinned prog");
+    let pinned_prog_fd =
+        Program::fd_from_pinned_path(path).expect("failed to get fd of pinned prog");
     let pinned_prog_id =
         Program::get_id_by_fd(pinned_prog_fd.as_fd()).expect("failed to determine pinned prog id");
 

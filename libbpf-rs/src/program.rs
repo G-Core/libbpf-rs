@@ -106,7 +106,6 @@ impl From<TracepointOpts> for libbpf_sys::bpf_tracepoint_opts {
     }
 }
 
-
 /// An immutable parsed but not yet loaded BPF program.
 pub type OpenProgram<'obj> = OpenProgramImpl<'obj>;
 /// A mutable parsed but not yet loaded BPF program.
@@ -548,7 +547,6 @@ pub type Program<'obj> = ProgramImpl<'obj>;
 /// A mutable loaded BPF program.
 pub type ProgramMut<'obj> = ProgramImpl<'obj, Mut>;
 
-
 /// Represents a loaded [`Program`].
 ///
 /// This struct is not safe to clone because the underlying libbpf resource cannot currently
@@ -624,24 +622,36 @@ impl<'obj> Program<'obj> {
         Ok(prog_info.id)
     }
 
-    /// Returns program fd by pin
-    pub fn get_fd_by_pin<P: AsRef<Path>>(path: P) -> Result<OwnedFd> {
-        let path_c = util::path_to_cstring(path)?;
+    /// Returns fd of a previously pinned program
+    pub fn fd_from_pinned_path<P: AsRef<Path>>(path: P) -> Result<OwnedFd> {
+        let path_c = util::path_to_cstring(&path)?;
         let path_ptr = path_c.as_ptr();
-        let fd = util::parse_ret_i32(unsafe { libbpf_sys::bpf_obj_get(path_ptr) })?;
 
+        let fd = unsafe { libbpf_sys::bpf_obj_get(path_ptr) };
+        let fd = util::parse_ret_i32(fd).with_context(|| {
+            format!(
+                "failed to retrieve BPF object from pinned path `{}`",
+                path.as_ref().display()
+            )
+        })?;
         let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
         // A pinned path may represent any kind of an object, verify that
-        // it represents a program before returning descriptor to the caller.
+        // it represents a program before returning the descriptor to the caller.
         let mut info: libbpf_sys::bpf_prog_info = unsafe { mem::zeroed() };
         let mut size = mem::size_of_val(&info) as u32;
         // SAFETY: All pointers are derived from references and hence valid.
-        util::parse_ret(unsafe {
+        let ret = unsafe {
             libbpf_sys::bpf_prog_get_info_by_fd(
                 fd.as_raw_fd(),
                 &mut info as *mut libbpf_sys::bpf_prog_info,
                 &mut size as *mut u32,
+            )
+        };
+        util::parse_ret(ret).with_context(|| {
+            format!(
+                "BPF object from pinned path `{}` is not a program",
+                path.as_ref().display()
             )
         })?;
 
