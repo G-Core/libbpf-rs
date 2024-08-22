@@ -12,6 +12,7 @@
 
 use std::ffi::c_void;
 use std::ffi::CString;
+use std::fs;
 use std::io;
 use std::mem::size_of_val;
 use std::os::fd::AsFd;
@@ -23,7 +24,9 @@ use std::os::raw::c_char;
 use std::ptr;
 use std::time::Duration;
 
+use crate::error::IntoError;
 use crate::util;
+use crate::Error;
 use crate::MapType;
 use crate::ProgramAttachType;
 use crate::ProgramType;
@@ -703,3 +706,39 @@ gen_info_impl!(
     libbpf_sys::bpf_link_get_next_id,
     libbpf_sys::bpf_link_get_fd_by_id
 );
+
+/// An enum describing type of eBPF object.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum BpfObjectType {
+    /// The object is a map.
+    Map,
+    /// The object is a program.
+    Program,
+    /// The object is a BPF link.
+    Link,
+}
+
+/// Get type of BPF object by fd.
+///
+/// This information is not exported directly by bpf_*_get_info_by_fd() functions,
+/// as kernel relies on the userspace code to know what kind of object it
+/// queries. The type of object can be recovered by fd only from the proc
+/// filesystem.The same approach is used in bpftool.
+pub fn object_type_from_fd(fd: BorrowedFd<'_>) -> Result<BpfObjectType> {
+    let fd_link = format!("/proc/self/fd/{}", fd.as_raw_fd());
+    let link_type = fs::read_link(fd_link)
+        .map_err(|e| Error::with_invalid_data(format!("Can't read fd link: {}", e)))?;
+    let link_type = link_type
+        .to_str()
+        .ok_or_invalid_data(|| "Can't convert PathBuf to str")?;
+
+    match link_type {
+        "anon_inode:bpf-link" => Ok(BpfObjectType::Link),
+        "anon_inode:bpf-map" => Ok(BpfObjectType::Map),
+        "anon_inode:bpf-prog" => Ok(BpfObjectType::Program),
+        other => Err(Error::with_invalid_data(format!(
+            "Unknown type of BPF fd: {}",
+            other
+        ))),
+    }
+}
