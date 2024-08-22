@@ -772,6 +772,24 @@ fn test_program_loading_fd_from_pinned_path() {
 
 #[tag(root)]
 #[test]
+fn test_program_loading_fd_from_pinned_path2() {
+    bump_rlimit_mlock();
+
+    let path = "/sys/fs/bpf/mymap_test_pin_to_load_from_path";
+    let map_name = "events";
+
+    let mut obj = get_test_object("runqslower.bpf.o");
+    let mut map = get_map_mut(&mut obj, map_name);
+    map.pin(path).expect("pinning map failed");
+
+    let pinned_prog_fd =
+        Program::fd_from_pinned_path(prog_path).expect_err("program fd obtained from pinned map");
+
+    map.unpin(path).expect("unpinning program failed");
+}
+
+#[tag(root)]
+#[test]
 fn test_object_loading_loaded_map_from_id() {
     bump_rlimit_mlock();
 
