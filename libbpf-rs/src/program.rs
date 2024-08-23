@@ -26,10 +26,12 @@ use libbpf_sys::bpf_func_id;
 
 use crate::util;
 use crate::util::validate_bpf_ret;
+use crate::util::BpfObjectType;
 use crate::AsRawLibbpf;
 use crate::Error;
 use crate::ErrorExt as _;
 use crate::Link;
+use crate::MapType;
 use crate::Mut;
 use crate::Result;
 
@@ -638,24 +640,14 @@ impl<'obj> Program<'obj> {
 
         // A pinned path may represent any kind of an object, verify that
         // it represents a program before returning the descriptor to the caller.
-        let mut info: libbpf_sys::bpf_prog_info = unsafe { mem::zeroed() };
-        let mut size = mem::size_of_val(&info) as u32;
-        // SAFETY: All pointers are derived from references and hence valid.
-        let ret = unsafe {
-            libbpf_sys::bpf_prog_get_info_by_fd(
-                fd.as_raw_fd(),
-                &mut info as *mut libbpf_sys::bpf_prog_info,
-                &mut size as *mut u32,
-            )
-        };
-        util::parse_ret(ret).with_context(|| {
-            format!(
-                "BPF object from pinned path `{}` is not a program",
-                path.as_ref().display()
-            )
-        })?;
-
-        Ok(fd)
+        let fd_type = util::object_type(fd.as_fd())?;
+        match fd_type {
+            BpfObjectType::Program => Ok(fd),
+            other => Err(Error::with_invalid_data(format!(
+                "Retrived BPF fd is not a program fd: {:#?}",
+                other
+            ))),
+        }
     }
 
     /// Returns flags that have been set for the program.

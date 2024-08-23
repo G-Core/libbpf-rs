@@ -1,14 +1,25 @@
 use std::ffi::CStr;
 use std::ffi::CString;
+use std::fs;
 use std::mem::transmute;
 use std::ops::Deref;
+use std::os::fd::AsRawFd;
+use std::os::fd::BorrowedFd;
 use std::os::raw::c_char;
 use std::path::Path;
 use std::ptr::NonNull;
 use std::sync::OnceLock;
 
+use crate::error::IntoError;
 use crate::Error;
 use crate::Result;
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum BpfObjectType {
+    Map,
+    Program,
+    Link,
+}
 
 pub fn str_to_cstring(s: &str) -> Result<CString> {
     CString::new(s).map_err(|e| Error::with_invalid_data(e.to_string()))
@@ -92,6 +103,25 @@ pub fn validate_bpf_ret<T>(ptr: *mut T) -> Result<NonNull<T>> {
     }
 }
 
+/// Get type of BPF object by fd.
+pub fn object_type(fd: BorrowedFd<'_>) -> Result<BpfObjectType> {
+    let fd_link = format!("/proc/self/fd/{}", fd.as_raw_fd());
+    let link_type = fs::read_link(fd_link)
+        .map_err(|e| Error::with_invalid_data(format!("Can't read fd link: {}", e.to_string())))?;
+    let link_type = link_type
+        .to_str()
+        .ok_or_invalid_data(|| "Can't convert PathBuf to str")?;
+
+    match link_type {
+        "anon_inode:bpf-link" => Ok(BpfObjectType::Link),
+        "anon_inode:bpf-map" => Ok(BpfObjectType::Map),
+        "anon_inode:bpf-prog" => Ok(BpfObjectType::Program),
+        other => Err(Error::with_invalid_data(format!(
+            "Unexpected type of BPF fd: {}",
+            other
+        ))),
+    }
+}
 
 // Fix me, If std::sync::LazyLock is stable(https://github.com/rust-lang/rust/issues/109736).
 pub(crate) struct LazyLock<T> {
