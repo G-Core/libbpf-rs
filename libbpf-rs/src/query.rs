@@ -727,7 +727,7 @@ pub enum BpfObjectType {
 pub fn object_type_from_fd(fd: BorrowedFd<'_>) -> Result<BpfObjectType> {
     let fd_link = format!("/proc/self/fd/{}", fd.as_raw_fd());
     let link_type = fs::read_link(fd_link)
-        .map_err(|e| Error::with_invalid_data(format!("Can't read fd link: {}", e.to_string())))?;
+        .map_err(|e| Error::with_invalid_data(format!("Can't read fd link: {}", e)))?;
     let link_type = link_type
         .to_str()
         .ok_or_invalid_data(|| "Can't convert PathBuf to str")?;
