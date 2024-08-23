@@ -772,7 +772,7 @@ fn test_program_loading_fd_from_pinned_path() {
 
 #[tag(root)]
 #[test]
-fn test_program_loading_fd_from_pinned_path2() {
+fn test_program_loading_fd_from_pinned_path_with_wrong_pin_type() {
     bump_rlimit_mlock();
 
     let path = "/sys/fs/bpf/mymap_test_pin_to_load_from_path";
@@ -782,8 +782,8 @@ fn test_program_loading_fd_from_pinned_path2() {
     let mut map = get_map_mut(&mut obj, map_name);
     map.pin(path).expect("pinning map failed");
 
-    let pinned_prog_fd =
-        Program::fd_from_pinned_path(prog_path).expect_err("program fd obtained from pinned map");
+    // Must fail, as the pinned path points to a map, not program.
+    let _ = Program::fd_from_pinned_path(path).expect_err("program fd obtained from pinned map");
 
     map.unpin(path).expect("unpinning program failed");
 }
