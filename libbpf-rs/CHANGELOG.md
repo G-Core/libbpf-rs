@@ -2,8 +2,6 @@ Unreleased
 ----------
 - Added `Program::fd_from_pinned_path` method for restoring program descriptor
   from a pinned path
-- Added `query::object_type_from_fd` function to get BPF object type by file
-  descriptor
 
 
 0.24.0

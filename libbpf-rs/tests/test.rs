@@ -24,7 +24,6 @@ use std::sync::mpsc::channel;
 use std::time::Duration;
 
 use libbpf_rs::num_possible_cpus;
-use libbpf_rs::query;
 use libbpf_rs::AsRawLibbpf;
 use libbpf_rs::Iter;
 use libbpf_rs::Linker;
@@ -788,19 +787,6 @@ fn test_program_loading_fd_from_pinned_path_with_wrong_pin_type() {
     let _ = Program::fd_from_pinned_path(path).expect_err("program fd obtained from pinned map");
 
     map.unpin(path).expect("unpinning program failed");
-}
-
-#[test]
-fn test_program_loading_fd_from_pinned_path_with_not_bfp_object() {
-    let path = "/tmp/libbpf-rs_not_a_bpf_object";
-    let not_object = fs::File::create(path).expect("failed to create a plain file");
-
-    // Must fail, as the pinned path points to a usual file, not a bpf object.
-    let _ = Program::fd_from_pinned_path(path).expect_err("program fd obtained from plain file");
-    let _ = query::object_type_from_fd(not_object.as_fd())
-        .expect_err("a common file was treated as a BPF object");
-
-    fs::remove_file(path).expect("failed to remove temporary file");
 }
 
 #[tag(root)]
